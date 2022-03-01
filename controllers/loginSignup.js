@@ -88,7 +88,7 @@ exports.signup_ApiController = async (req, res, next) => {
         return res.json({
           message: "Account created successfully",
           user: saveUserData,
-          token: login.token
+          token: login.token,
         });
       } else {
         throw new Error("Failed to save user data to Database");
@@ -111,7 +111,7 @@ exports.signup_ApiController = async (req, res, next) => {
         error.fullName = "First name is required!";
       }
 
-	  if (!payment_method) {
+      if (!payment_method) {
         error.payment_method = "Please provide your bank account!";
       }
 
@@ -131,128 +131,113 @@ exports.signup_ApiController = async (req, res, next) => {
   }
 };
 
-exports.accountVerify_CodeSubmit_ApiController = async (req, res, next) => {
-  let { verifyCode, signUpUserId, verificationFor } = req.body;
+exports.verifyCode = async (req, res, next) => {
+  let { verifyCode, email } = req.body;
+  const verificationFor = "email";
 
   try {
     verifyCode = !!verifyCode ? String(verifyCode).trim() : false;
-    const isValidObjId = mongoose.Types.ObjectId.isValid(signUpUserId);
 
     const error = {};
-    if (verifyCode && isValidObjId) {
-      const userData = await User.findOne({ _id: signUpUserId });
+    const userData = await User.findOne({ email });
 
-      if (userData) {
-        if (verificationFor === "email") {
-          if (!userData.isEmailVerified) {
-            if (userData.emailVerifyCode.wrongTry <= 5) {
-              const expireTime = userData.emailVerifyCode.codeExpireTime;
-              const currentEpochTime = Date.now();
+    if (userData) {
+      if (verificationFor === "email") {
+        if (userData.forgetCode.wrongTry <= 5) {
+          const expireTime = userData.forgetCode.codeExpireTime;
+          const currentEpochTime = Date.now();
 
-              if (expireTime > currentEpochTime) {
-                if (!userData.emailVerifyCode.used) {
-                  if (userData.emailVerifyCode.code == verifyCode) {
-                    await User.updateOne(
-                      { _id: userData._id },
-                      { isEmailVerified: true, "emailVerifyCode.used": true }
-                    );
+          if (expireTime > currentEpochTime) {
+            if (!userData.forgetCode.used) {
+              if (userData.forgetCode.code == verifyCode) {
+                await User.updateOne(
+                  { _id: userData._id },
+                  { isEmailVerified: true, "forgetCode.used": true }
+                );
 
-                    // const subject = "";
-                    // const plainTextMsg = "Enter the phone verification code:";
-                    // const codeName = "Phone_verification_code";
-                    // const sendResponse = (await codeSaveDBandSend(userData, subject, plainTextMsg, codeName, "phone")) || {};
-
-                    return res.json({ message: "Email verified successfully" });
-                  } else {
-                    await User.updateOne(
-                      { _id: userData._id },
-                      {
-                        "emailVerifyCode.wrongTry":
-                          userData.emailVerifyCode.wrongTry + 1,
-                      }
-                    );
-                    error.issue = `Incorrect verification code, please try again or contact ${config.adminEmailAddress}`;
-                  }
-                } else {
-                  error.issue = "The code recovery code is already used!";
-                }
+                return res.json({ message: "Email verified successfully" });
               } else {
-                error.issue = "The code is expired.";
+                await User.updateOne(
+                  { _id: userData._id },
+                  {
+                    "forgetCode.wrongTry": userData.forgetCode.wrongTry + 1,
+                  }
+                );
+                error.issue = `Incorrect verification code, please try again or contact ${config.adminEmailAddress}`;
               }
             } else {
-              error.issue = "Tried many times with wrong code.!";
+              error.issue = "The code recovery code is already used!";
             }
           } else {
-            error.issue = "Your Email address is already verified!";
-          }
-        } else if (verificationFor === "phone") {
-          if (!userData.isPhoneVerified) {
-            if (userData.phoneVerifyCode.wrongTry <= 5) {
-              const expireTime = userData.phoneVerifyCode.codeExpireTime;
-              const currentEpochTime = Date.now();
-
-              if (expireTime > currentEpochTime) {
-                if (!userData.phoneVerifyCode.used) {
-                  if (userData.phoneVerifyCode.code == verifyCode) {
-                    await User.updateOne(
-                      { _id: userData._id },
-                      { isPhoneVerified: true, "phoneVerifyCode.used": true }
-                    );
-
-                    const directLogin = true;
-                    const keepLogged = true;
-
-                    const nxt = next;
-                    const login = await doLogin(
-                      nxt,
-                      userData,
-                      keepLogged,
-                      directLogin
-                    );
-                    userData.roles = undefined;
-                    userData.password = undefined;
-                    userData.emailVerifyCode = undefined;
-                    userData.phoneVerifyCode = undefined;
-                    userData.forgetCode = undefined;
-
-                    userData.isPhoneVerified = true;
-
-                    return res.json({
-                      message: "Phone verified successfully",
-                      token: login.sessionToken,
-                      user: userData,
-                    });
-                  } else {
-                    await User.updateOne(
-                      { _id: userData._id },
-                      {
-                        "phoneVerifyCode.wrongTry":
-                          userData.phoneVerifyCode.wrongTry + 1,
-                      }
-                    );
-                    error.issue = `Incorrect verification code, please try again or contact ${config.adminEmailAddress}`;
-                  }
-                } else {
-                  error.issue = "The code recovery code is already used!";
-                }
-              } else {
-                error.issue = "The code is expired.";
-              }
-            } else {
-              error.issue = "Tried many times with wrong code.!";
-            }
-          } else {
-            error.issue = "Your Phone address is already verified!";
+            error.issue = "The code is expired.";
           }
         } else {
-          error.issue = "Something is messing!";
+          error.issue = "Tried many times with wrong code.!";
+        }
+      } else if (verificationFor === "phone") {
+        if (!userData.isPhoneVerified) {
+          if (userData.phoneVerifyCode.wrongTry <= 5) {
+            const expireTime = userData.phoneVerifyCode.codeExpireTime;
+            const currentEpochTime = Date.now();
+
+            if (expireTime > currentEpochTime) {
+              if (!userData.phoneVerifyCode.used) {
+                if (userData.phoneVerifyCode.code == verifyCode) {
+                  await User.updateOne(
+                    { _id: userData._id },
+                    { isPhoneVerified: true, "phoneVerifyCode.used": true }
+                  );
+
+                  const directLogin = true;
+                  const keepLogged = true;
+
+                  const nxt = next;
+                  const login = await doLogin(
+                    nxt,
+                    userData,
+                    keepLogged,
+                    directLogin
+                  );
+                  userData.roles = undefined;
+                  userData.password = undefined;
+                  userData.forgetCode = undefined;
+                  userData.phoneVerifyCode = undefined;
+                  userData.forgetCode = undefined;
+
+                  userData.isPhoneVerified = true;
+
+                  return res.json({
+                    message: "Phone verified successfully",
+                    token: login.sessionToken,
+                    user: userData,
+                  });
+                } else {
+                  await User.updateOne(
+                    { _id: userData._id },
+                    {
+                      "phoneVerifyCode.wrongTry":
+                        userData.phoneVerifyCode.wrongTry + 1,
+                    }
+                  );
+                  error.issue = `Incorrect verification code, please try again or contact ${config.adminEmailAddress}`;
+                }
+              } else {
+                error.issue = "The code recovery code is already used!";
+              }
+            } else {
+              error.issue = "The code is expired.";
+            }
+          } else {
+            error.issue = "Tried many times with wrong code.!";
+          }
+        } else {
+          error.issue = "Your Phone address is already verified!";
         }
       } else {
-        error.issue = "Invalid request!";
+        error.issue = "Something is messing!";
       }
     } else {
-      error.issue = "Request rejected!";
-      return res.status(406).json({ error });
+      error.issue = "Invalid request!";
     }
 
     return res.status(400).json({ error });
@@ -261,69 +246,63 @@ exports.accountVerify_CodeSubmit_ApiController = async (req, res, next) => {
   }
 };
 
-exports.resendAccountVerifyCode_ApiController = async (req, res, next) => {
-  let { signUpUserId, resendCodeFor } = req.body;
+exports.sendVerifyCode = async (req, res, next) => {
+  // let { signUpUserId, resendCodeFor } = req.body;
+  console.log(req.body);
+  let { email } = req.body;
+  let resendCodeFor = "email";
 
   try {
-    const isValidObjId = mongoose.Types.ObjectId.isValid(signUpUserId);
+    // const isValidObjId = mongoose.Types.ObjectId.isValid(signUpUserId);
 
     const error = {};
-    if (resendCodeFor && isValidObjId) {
-      const userData = await User.findOne({ _id: signUpUserId });
+    const userData = await User.findOne({ email });
 
-      if (userData) {
-        if (resendCodeFor === "email") {
-          if (!userData.isEmailVerified) {
-            const subject = "Verify your email address";
-            const plainTextMsg = "Enter the phone verification code:";
-            const codeName = "Email_verification_code";
-            const sendResponse =
-              (await codeSaveDBandSend(
-                userData,
-                subject,
-                plainTextMsg,
-                codeName
-              )) || {};
+    if (userData) {
+      if (resendCodeFor === "email") {
+        const subject = "Forget Password";
+        const plainTextMsg = "Enter the verification code:";
+        const codeName = "forget_code";
+        const sendResponse =
+          (await codeSaveDBandSend(
+            userData,
+            subject,
+            plainTextMsg,
+            codeName
+          )) || {};
 
-            if (sendResponse.accepted) {
-              return res.json({ message: "Email verification code re-sended" });
-            } else {
-              error.issue = "Failed to  re-send email verification code!";
-            }
+        if (sendResponse.accepted) {
+          return res.json({ message: "Email verification code sended" });
+        } else {
+          error.issue = "Failed to send email verification code!";
+        }
+      } else if (resendCodeFor === "phone") {
+        if (!userData.isPhoneVerified) {
+          const subject = "";
+          const plainTextMsg = "Enter the Phone code:";
+          const codeName = "Phone_verification_code";
+          const sendResponse =
+            (await codeSaveDBandSend(
+              userData,
+              subject,
+              plainTextMsg,
+              codeName,
+              "phone"
+            )) || {};
+
+          if (sendResponse.accepted) {
+            return res.json({ message: "Phone verification code re-sended" });
           } else {
-            error.issue = "Your Email address is already verified!";
-          }
-        } else if (resendCodeFor === "phone") {
-          if (!userData.isPhoneVerified) {
-            const subject = "";
-            const plainTextMsg = "Enter the Phone code:";
-            const codeName = "Phone_verification_code";
-            const sendResponse =
-              (await codeSaveDBandSend(
-                userData,
-                subject,
-                plainTextMsg,
-                codeName,
-                "phone"
-              )) || {};
-
-            if (sendResponse.accepted) {
-              return res.json({ message: "Phone verification code re-sended" });
-            } else {
-              error.issue = "Failed to  re-send Phone verification code!";
-            }
-          } else {
-            error.issue = "Your Phone address is already verified!";
+            error.issue = "Failed to  re-send Phone verification code!";
           }
         } else {
-          error.issue = "Something is messing!";
+          error.issue = "Your Phone address is already verified!";
         }
       } else {
-        error.issue = "Invalid request!";
+        error.issue = "Something is messing!";
       }
     } else {
-      error.issue = "Request rejected!";
-      return res.status(406).json({ error });
+      error.issue = "Invalid request!";
     }
 
     return res.status(400).json({ error });
@@ -394,6 +373,76 @@ exports.login_ApiController = async (req, res, next) => {
         error.password = "Please enter your password!";
       }
     }
+    return res.status(400).json({ error });
+  } catch (err) {
+    next(err);
+  }
+};
+
+exports.changePassword = async (req, res, next) => {
+  let { verifyCode, email, newPassword } = req.body;
+
+  try {
+    // validate
+    verifyCode = !!verifyCode ? String(verifyCode).trim() : false;
+
+    const error = {};
+    // validate
+    if (newPassword) {
+      const strongPasswordRegex = /^(?=.*\d)(?=.*[a-z])(?=.*[A-Z]).{8,32}$/;
+      var passwordStrong = newPassword.match(strongPasswordRegex);
+      if (passwordStrong) {
+        const userData = await User.findOne({ email });
+        if (userData) {
+          if (userData.forgetCode.wrongTry <= 5) {
+            const expireTime = userData.forgetCode.codeExpireTime;
+            const currentEpochTime = Date.now();
+
+            if (expireTime > currentEpochTime) {
+              if (!userData.forgetCode.used) {
+                if (userData.forgetCode.code == verifyCode) {
+                  const hashedPassword = await bcrypt.hash(
+                    newPassword,
+                    config.saltOrRounds
+                  );
+                  await User.updateOne(
+                    { _id: userData._id },
+                    {
+                      isEmailVerified: true,
+                      password: hashedPassword,
+                      "forgetCode.used": true,
+                    }
+                  );
+                  return res.json({ message: "Password has been changed!" });
+                } else {
+                  await User.updateOne(
+                    { _id: userData._id },
+                    {
+                      "forgetCode.wrongTry": userData.forgetCode.wrongTry + 1,
+                    }
+                  );
+                  error.issue = `Incorrect verification code, please try again or contact ${config.adminEmailAddress}`;
+                }
+              } else {
+                error.issue = "The code recovery code is already used!";
+              }
+            } else {
+              error.issue = "The code is expired.";
+            }
+          } else {
+            error.issue = "Tried many times with wrong code.!";
+          }
+        } else {
+          error.issue = "Invalid request!";
+        }
+      } else {
+        error.password =
+          "Password must be 8-32 characters long and contain at least 1 uppercase letter and 1 number.";
+      }
+    } else {
+      error.password = "Please enter your password!";
+    }
+
     return res.status(400).json({ error });
   } catch (err) {
     next(err);

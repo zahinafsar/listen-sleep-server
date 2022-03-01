@@ -1,12 +1,13 @@
 const express = require("express");
 
-const { signup_ApiController, accountVerify_CodeSubmit_ApiController, resendAccountVerifyCode_ApiController, login_ApiController } = require("../controllers/loginSignup");
+const { signup_ApiController, sendVerifyCode, verifyCode, login_ApiController, changePassword } = require("../controllers/loginSignup");
 
 const router = express.Router();
 
 router.post("/signup", signup_ApiController);
-// router.post("/account-verify", accountVerify_CodeSubmit_ApiController);
-// router.post("/resend-verify-code", resendAccountVerifyCode_ApiController);
+router.post("/code-send", sendVerifyCode);
+router.post("/change-password", changePassword);
+router.post("/code-verify", verifyCode);
 router.post("/login", login_ApiController);
 
 
