@@ -6,6 +6,7 @@ const { doLogin, codeSaveDBandSend } = require("../utils/func");
 const Stripe = require("stripe");
 const stripe = Stripe(process.env.STRIPE_SECRET_KEY);
 const moment = require("moment");
+const { payment } = require("../utils/parser");
 
 exports.signup_ApiController = async (req, res, next) => {
   let {
@@ -13,6 +14,7 @@ exports.signup_ApiController = async (req, res, next) => {
     fullName,
     password: newPass,
     payment_method,
+    payment_period,
   } = req.body;
 
   try {
@@ -55,15 +57,13 @@ exports.signup_ApiController = async (req, res, next) => {
           default_payment_method: payment_method,
         },
       });
-
       const subscription = await stripe.subscriptions.create({
         customer: customer.id,
         items: [
           {
-            price: "price_1KXunJLr6WNewAuktFvsgORE",
+            price: payment[payment_period],
           },
-        ],
-        trial_end: moment().add(3, "days").unix(),
+        ]
       });
       const encryptedPassword = await bcrypt.hash(newPass, config.saltOrRounds);
       const currentEpochTime = Date.now();
